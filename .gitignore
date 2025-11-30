@@ -16,43 +16,45 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Venv
-venv/
-.env/
-.env.bak
-.python-version
+# Backend venv
+backend/venv/
+backend/.venv/
+backend/env/
+backend/.env/
+backend/.env.*
+backend/.python-version
 
-# Paquetes
-build/
-dist/
-pip-wheel-metadata/
-*.egg-info/
-.eggs/
+# Backend Python build
+backend/build/
+backend/dist/
+backend/pip-wheel-metadata/
+backend/*.egg-info/
+backend/.eggs/
 
 # PyInstaller
-*.spec
+backend/*.spec
 
 # Test
-.pytest_cache/
-.coverage
-.cache
+backend/.pytest_cache/
+backend/.coverage
+backend/.cache
 
 # FastAPI / Uvicorn
-*.pid
+backend/*.pid
 
-# Node Dependencies
-node_modules/
+# Node Dependencies (Frontend)
+frontend/node_modules/
 
-# Builds
-dist/
-build/
+# Frontend Builds
+frontend/dist/
+frontend/build/
 
 # Vite Cache
-.vite/
+frontend/.vite/
 
-# React Cache
-.cache/
-.next/
+# React / Next Cache
+frontend/.cache/
+frontend/.next/
 
 # Testing
 coverage/
