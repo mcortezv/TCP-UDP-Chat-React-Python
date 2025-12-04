@@ -5,7 +5,6 @@ export function RefreshButton() {
         <div className="flex items-center gap-4">
             <Button
                 variant="outlined"
-                // 1. Añadir color="blue-gray" para que coincida con el ComboBox y tenga un borde oscuro
                 color="blue-gray"
                 className="flex items-center gap-3 ml-4"
             >
@@ -15,7 +14,6 @@ export function RefreshButton() {
                     fill="none"
                     viewBox="0 0 24 24"
                     strokeWidth={2}
-                    // 2. stroke="currentColor" asegura que el ícono tome el color del tema (blue-gray)
                     stroke="currentColor"
                     className="h-4 w-5"
                 >
