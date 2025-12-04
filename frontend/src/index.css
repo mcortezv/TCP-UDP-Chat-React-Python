@@ -1,3 +1,119 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+@keyframes floatY {
+    0% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-18px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+.animate-float {
+    animation: floatY 4s ease-in-out infinite;
+}
+
+
+@keyframes floatXY {
+    0% {
+        transform: translate(0px, 0px) rotate(0deg);
+    }
+    25% {
+        transform: translate(25px, -20px) rotate(2deg);
+    }
+    50% {
+        transform: translate(40px, -35px) rotate(-2deg);
+    }
+    75% {
+        transform: translate(20px, -15px) rotate(1deg);
+    }
+    100% {
+        transform: translate(0px, 0px) rotate(0deg);
+    }
+}
+
+.animate-float-slow {
+    animation: floatXY 9s ease-in-out infinite;
+}
+
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(25px) scale(0.97);
+        filter: blur(4px);
+    }
+    60% {
+        opacity: 0.7;
+        transform: translateY(8px) scale(1.01);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+    }
+}
+
+.animate-fade {
+    animation: fadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+@keyframes scalePulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.015);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.animate-pulse-slow {
+    animation: scalePulse 3s ease-in-out infinite;
+}
+
+
+.delay-100 {
+    animation-delay: 0.1s;
+}
+
+.delay-300 {
+    animation-delay: 0.3s;
+}
+
+.delay-500 {
+    animation-delay: 0.5s;
+}
+
+.delay-700 {
+    animation-delay: 0.7s;
+}
+
+.delay-900 {
+    animation-delay: 0.9s;
+}
+
+.delay-1200 {
+    animation-delay: 1.2s;
+}
+
+.delay-1500 {
+    animation-delay: 1.5s;
+}
+
+.delay-1800 {
+    animation-delay: 1.8s;
+}
+
+.delay-2200 {
+    animation-delay: 2.2s;
+}
