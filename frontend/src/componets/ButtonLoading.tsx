@@ -18,6 +18,7 @@ export function ButtonLoading() {
                 className="rounded-full"
                 loading={loading}
                 onClick={handleClick}
+                type="submit"
             >
                 {loading ? "Servidor Activo" : "Iniciar Servidor"}
             </Button>
