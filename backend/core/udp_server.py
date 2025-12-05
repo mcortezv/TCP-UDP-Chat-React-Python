@@ -1,24 +1,23 @@
 import socket
 import threading
 
-HOST = "192.168.0.3"
-PORT = 5000
+class UDPServer(threading.Thread):
 
-server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-server.bind((HOST, PORT))
+    def __init__(self, ip, port, global_clients):
+        super().__init__(daemon=True)
+        self.ip = ip
+        self.port = port
+        self.clients = global_clients
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.server.bind((ip, port))
 
-print("Servidor UDP escuchando en", HOST, "puerto", PORT)
+    def run(self):
+        print("Servidor UDP escuchando en", self.ip, "puerto", self.port)
+        while True:
+            data, addr = self.server.recvfrom(1024)
 
-clients = set()
+            self.clients.add(addr)
 
-# bucle para recibir y reenviar
-while True:
-    data, addr = server.recvfrom(1024)
-
-    # registrar cliente si no esta
-    clients.add(addr)
-
-    # reenviar mensaje a todos menos al que lo envio
-    for c in clients:
-        if c != addr:
-            server.sendto(data, c)
+            for c in self.clients:
+                if c != addr:
+                    self.server.sendto(data, c)
