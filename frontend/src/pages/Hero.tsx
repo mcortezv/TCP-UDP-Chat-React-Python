@@ -1,9 +1,43 @@
 import { Typography, Card } from "@material-tailwind/react";
 import { Input } from "@material-tailwind/react";
-import { ButtonLoading } from "../componets/ButtonLoading";
 import { Button } from "@material-tailwind/react";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+
 
 export default function Hero() {
+    const [username, setUsername] = useState("");
+    const navigate = useNavigate();
+
+
+    async function handleRegister(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        try {
+            if(username.trim() != ""){
+                const response = await fetch("http://localhost:8000/client/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                    }),
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    alert("Error: " + data.error);
+                } else {
+                    navigate("/chat");
+                }
+            } else {
+                alert("El nombre de usuario no puede estar vacio");
+            }
+        } catch (error) {
+            alert("Error:" + error);
+        }
+    }
+
     return (
         <div className="relative grid min-h-[100vh] w-screen p-8">
             <div className="flex flex-col-reverse items-center justify-between gap-4 self-start md:flex-row">
@@ -26,12 +60,14 @@ export default function Hero() {
                     Ingresa tu nombre para identificarte y podras enviar  mensajes <br />
                     visibles para los demás usuarios activos en el Chat.
                 </Typography>
-                <div className="w-80 mx-auto mt-8">
-                    <Input label="Nombre" />
-                </div>
-                <div className="mx-auto mt-8 animate-pulse-slow">
-                    <Button className="w-48 h-12 rounded-full">Entrar al Chat</Button>
-                </div>
+                <form onSubmit={handleRegister}>
+                    <div className="w-80 mx-auto mt-8">
+                        <Input label="Nombre" onChange={(e) => setUsername(e.target.value)} />
+                    </div>
+                    <div className="mx-auto mt-8 animate-pulse-slow">
+                        <Button className="w-48 h-12 rounded-full" type="submit">Entrar al Chat</Button>
+                    </div>
+                </form>
             </div>
             <div className="hidden md:block absolute top-[14%] left-[19%] animate-float-slow delay-100">
                 <img
