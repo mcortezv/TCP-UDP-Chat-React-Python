@@ -1,12 +1,13 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
-from core.protocol_selector import ProtocolSelector
+from core.server_controller import ServerController
+from routes.server import router as server_router
+from routes.client import router as client_router
 
 
 def main():
     app = FastAPI()
-    server = ProtocolSelector()
+    app.state.server = ServerController()
 
     app.add_middleware(
         CORSMiddleware,
@@ -16,42 +17,8 @@ def main():
         allow_headers=["*"]
     )
 
-    class LoginData(BaseModel):
-        username: str
-
-    class MessageData(BaseModel):
-        message: str
-
-
-    @app.post("/run")
-    def run(protocol: str):
-        return server.run(protocol)
-
-    @app.post("/shutdown")
-    def shutdown():
-        server.shutdown()
-        return {"status": "Servidor detenido"}
-
-    @app.post("/login")
-    def login(data: LoginData):
-        if data.username in server.clients:
-            return {"error": "El usuario ya existe"}
-        server.clients.add(data.username)
-        return {"status": "OK", "username": data.username}
-
-    @app.post("/send")
-    def send(data: MessageData):
-        server.history.append(data.message)
-        return {"status": "OK"}
-
-    @app.get("/history")
-    def get_history():
-        return server.history
-
-    @app.delete("/clear")
-    def clear():
-        server.history.clear()
-        return {"status": "Historial Borrado"}
+    app.include_router(server_router, prefix="/server", tags=["Server"])
+    app.include_router(client_router, prefix="/client", tags=["Client"])
 
     return app
 
@@ -60,4 +27,4 @@ app = main()
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
