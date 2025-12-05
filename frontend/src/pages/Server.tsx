@@ -117,10 +117,10 @@ export default function Config() {
                 </Card>
             </div>
             <div className="flex-col gap-2 pt-40 pb-40 text-center">
-                <Typography variant="h1" color="blue-gray" className="text-6xl">
+                <Typography variant="h1" color="blue-gray" className="text-8xl">
                     Welcome Admin
                 </Typography>
-                <Typography variant="lead" color="blue-gray" className="opacity-70 text-2xl mt-3">
+                <Typography variant="lead" color="blue-gray" className="opacity-70 text-2xl mt-4">
                     Inicia el servidor o cambia la configuración desde aquí.
                 </Typography>
                 <form onSubmit={handleRun}>
