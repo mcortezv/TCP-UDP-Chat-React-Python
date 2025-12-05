@@ -149,7 +149,7 @@ export default function Hero() {
                         </Typography>
                         <Typography color="blue-gray" className="font-normal opacity-70">
                             Con el objetivo de que al cambiar de protocolo los mensajes no se vean
-                            afectados, el servidor guarda un historial de mensajes en un archivo json.
+                            afectados, el servidor guarda un historial de mensajes en una lista.
                         </Typography>
                     </Card>
                 </a>
@@ -176,7 +176,7 @@ export default function Hero() {
                             Funcionalidad
                         </Typography>
                         <Typography color="blue-gray" className="font-normal opacity-70">
-                            Para iniciar el Chat el usuario debe ingresar su nombre, podra acceder a la 
+                            Para iniciar el Chat el usuario debe ingresar su nombre, podra acceder a la
                             sala de Chat y enviar mensajes que los otros usuarios podran ver en tiempo real.
                         </Typography>
                     </Card>
