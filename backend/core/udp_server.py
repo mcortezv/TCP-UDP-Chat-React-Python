@@ -1,9 +1,21 @@
 import socket
 import threading
 
+"""
+Modulo que reprsenta un servidor UDP
+"""
 
 class UDPServer(threading.Thread):
+    """
+    Clase que representa un servidor UDP, permite crearlo correrlo y detenerlo.
+    """
     def __init__(self, ip, port, controller):
+        """
+        Constructor de la clase.
+        :param ip: direccion ip del servidor.
+        :param port: puerto del servidor.
+        :param controller: controla del servidor.
+        """
         super().__init__(daemon=True)
         self.ip = ip
         self.port = port
@@ -12,7 +24,6 @@ class UDPServer(threading.Thread):
         self.running = False
         self.clients = {}  # addr -> username
         self.init_error = None
-
         try:
             self.server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -29,6 +40,9 @@ class UDPServer(threading.Thread):
                 self.server = None
 
     def run(self):
+        """
+        Funcion que permite correr el servidor.
+        """
         if not self.running or not self.server:
             return
         try:
@@ -72,12 +86,15 @@ class UDPServer(threading.Thread):
                             except:
                                 pass
             except socket.timeout:
-                # Timeout normal, continuar el bucle
+                # Timeout, es normal, continua el bucle
                 continue
             except Exception as e:
                 break
 
     def stop(self):
+        """
+        Funcion que permite detener el servidor.
+        """
         self.running = False
         self.clients.clear()
         if self.server:

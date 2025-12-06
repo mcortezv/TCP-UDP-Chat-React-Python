@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-
+"""
+Modulo que define los enpoints para controlar al cliente.
+"""
 router = APIRouter()
 
 class LoginData(BaseModel):
@@ -13,6 +15,12 @@ class MessageData(BaseModel):
 
 @router.post("/login")
 def login(req: Request, data: LoginData):
+    """
+    Funcion que pemite iniciar un nuevo cliente.
+    :param req: acceso a servidor singleton
+    :param data: nombre del usuario que quiere crear un nuevo cliente
+    :return: nombre del usuario
+    """
     server = req.app.state.server
 
     # Verificar que hay un servidor corriendo
@@ -32,12 +40,23 @@ def login(req: Request, data: LoginData):
 
 @router.post("/logout")
 def logout(req: Request, data: LoginData):
+    """
+    Funcion que permite remover al cliente del servidor.
+    :param req: acceso a servidor singleton
+    :param data: nombre del usuario que quiere remover
+    :return: nombre del usuario
+    """
     server = req.app.state.server
     server.remove_client(data.username)
     return {"status": "OK", "username": data.username}
 
 @router.post("/send")
 def send(req: Request, data: MessageData):
+    """
+    Funcion que permite enviar un mensaje al servidor.
+    :param req: servidor singleton
+    :param data: mensaje a enviar
+    """
     server = req.app.state.server
 
     # Verificar que el cliente existe
@@ -58,10 +77,20 @@ def send(req: Request, data: MessageData):
 
 @router.get("/history")
 def history(req: Request):
+    """
+    Funcion que devuelve el historial de mensajes que han pasado por el servidor.
+    :param req: servidor singleton
+    :return: diccionarrio con el historial de mensajes
+    """
     server = req.app.state.server
     return {"history": server.history}
 
 @router.get("/clients")
 def list_clients(req: Request):
+    """
+    Funcion que regresa una lista de clientes registrados (Solo TCP). No lo usamos al final xd
+    :param req: servidor singleton
+    :return: diccionarrio con los clientes registrados
+    """
     server = req.app.state.server
     return {"clients": list(server.clients)}

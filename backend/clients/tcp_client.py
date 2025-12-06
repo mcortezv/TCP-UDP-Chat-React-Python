@@ -4,7 +4,18 @@ import time
 
 
 class TCPClient:
+    """
+    Clase que represta un objeto tipo Cliente TCP, permite iniciar
+    una conexión, recibir y enviar mensajes.
+    """
     def __init__(self, username, host, port, controller):
+        """
+        Contructor de la clase TCPClient
+        :param username: nombre del usuario de la conexion
+        :param host: direccion ip del servidor
+        :param port: puerto del servidor
+        :param controller: controlador del cliente
+        """
         self.username = username
         self.host = host
         self.port = port
@@ -15,9 +26,15 @@ class TCPClient:
         self.connect_lock = threading.Lock()
 
     def start(self):
+        """
+        Funcion que permite iniciar el hilo del cliente
+        """
         threading.Thread(target=self._connect_loop, daemon=True).start()
 
     def _connect_loop(self):
+        """
+        Funcion que crea un bucle de conexion con el servidor
+        """
         while self.running:
             if self.sock is None:
                 try:
@@ -38,6 +55,9 @@ class TCPClient:
             time.sleep(1)
 
     def _recv_loop(self):
+        """
+        Funcion que crea un bucle de recepcion de mensajes
+        """
         while self.running and self.sock:
             try:
                 data = self.sock.recv(1024)
@@ -54,6 +74,10 @@ class TCPClient:
         self.sock = None
 
     def send(self, message: str):
+        """
+        Funcion que permite enviar mensajes en el servidor
+        :param message: mensaje que se envia
+        """
         payload = f"{self.username}: {message}|{time.time()}".encode()
         if self.sock:
             try:
@@ -62,6 +86,9 @@ class TCPClient:
                 self.sock = None
 
     def stop(self):
+        """
+        Funcion que permite cerrar el socket del cliente
+        """
         self.running = False
         try:
             if self.sock:
