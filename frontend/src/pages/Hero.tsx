@@ -29,12 +29,13 @@ export default function Hero() {
                     alert("Error: " + data.error);
                 } else {
                     navigate("/chat");
+                    sessionStorage.setItem("username", username);
                 }
             } else {
                 alert("El nombre de usuario no puede estar vacio");
             }
         } catch (error) {
-            alert("Error:" + error);
+            alert("Error de conexión con el servidor");
         }
     }
 

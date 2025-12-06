@@ -33,7 +33,7 @@ export default function Config() {
                 alert("Seleccione un protocolo antes de iniciar el servidor");
             }
         } catch (error) {
-            alert("Error:" + error);
+            alert("Error de conexión con el servidor");
         }
     }
 
@@ -50,7 +50,7 @@ export default function Config() {
                 setLoading(false);
             }
         } catch (error) {
-            alert("Error:" + error);
+            alert("Error de conexión con el servidor");
         }
     }
 
@@ -67,7 +67,7 @@ export default function Config() {
                 alert("Error Historial de Mensajes Borrado");
             }
         } catch (error) {
-            alert("Error:" + error);
+            alert("Error de conexión con el servidor");
         }
     }
 

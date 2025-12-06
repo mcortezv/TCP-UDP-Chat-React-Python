@@ -36,11 +36,6 @@ class TCPClient:
                 data = self.sock.recv(1024)
                 if not data:
                     break
-                try:
-                    txt = data.decode()
-                    self.controller.history.append(txt)
-                except:
-                    pass
             except:
                 break
         try:
