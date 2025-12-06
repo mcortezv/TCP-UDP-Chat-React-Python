@@ -22,11 +22,18 @@ class TCPClient:
             if self.sock is None:
                 try:
                     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(5)
                     s.connect((self.host, self.port))
+                    s.settimeout(None)
+
+                    # Registrar usuario en el servidor
+                    register_msg = f"CONECTADO:{self.username}".encode()
+                    s.sendall(register_msg)
+
                     self.sock = s
                     self.recv_thread = threading.Thread(target=self._recv_loop, daemon=True)
                     self.recv_thread.start()
-                except:
+                except Exception as e:
                     self.sock = None
             time.sleep(1)
 
@@ -36,7 +43,8 @@ class TCPClient:
                 data = self.sock.recv(1024)
                 if not data:
                     break
-            except:
+                # Los mensajes ya estan en el historial del servidor
+            except Exception as e:
                 break
         try:
             if self.sock:
@@ -50,8 +58,8 @@ class TCPClient:
         if self.sock:
             try:
                 self.sock.sendall(payload)
-            except:
-                pass
+            except Exception as e:
+                self.sock = None
 
     def stop(self):
         self.running = False
@@ -60,13 +68,3 @@ class TCPClient:
                 self.sock.close()
         except:
             pass
-
-    def switch_protocol(self, protocol, host, port):
-        try:
-            if self.sock:
-                self.sock.close()
-        except:
-            pass
-        self.sock = None
-        self.host = host
-        self.port = port

@@ -8,7 +8,6 @@ from routes.client import router as client_router
 def main():
     app = FastAPI()
     app.state.server = ServerController()
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

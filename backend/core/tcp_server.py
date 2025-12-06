@@ -20,7 +20,6 @@ class TCPServer(threading.Thread):
             self.controller.history.append(decoded)
         except:
             pass
-
         for c in list(self.clients):
             if c != source_sock:
                 try:
