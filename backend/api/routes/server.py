@@ -15,12 +15,8 @@ def run(req: Request, data: ProtocolData):
 def shutdown(req: Request):
     server = req.app.state.server
     server.shutdown()
+    server.clients.clear()
     return {"status": "Servidor detenido"}
-
-@router.post("/switch")
-def switch(req: Request, data: ProtocolData):
-    server = req.app.state.server
-    return server.switch_protocol(data.protocol)
 
 @router.delete("/clear")
 def clear(req: Request):

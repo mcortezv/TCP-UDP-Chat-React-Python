@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+
 router = APIRouter()
 
 class LoginData(BaseModel):
@@ -13,9 +14,20 @@ class MessageData(BaseModel):
 @router.post("/login")
 def login(req: Request, data: LoginData):
     server = req.app.state.server
+
+    # Verificar que hay un servidor corriendo
+    if not server.is_running():
+        return {"error": "No hay servidor corriendo. Inicia el servidor primero."}
+
+    # Verificar si el usuario ya existe
     if data.username in server.clients:
+        print(f"[API] ERROR: Usuario {data.username} ya existe")
         return {"error": "El usuario ya existe"}
+
+    # Crear cliente
     client = server.create_client(data.username)
+    if client is None:
+        return {"error": "No se pudo crear el cliente"}
     return {"status": "OK", "username": data.username}
 
 @router.post("/logout")
@@ -27,12 +39,22 @@ def logout(req: Request, data: LoginData):
 @router.post("/send")
 def send(req: Request, data: MessageData):
     server = req.app.state.server
-    if data.username not in server.client_objs:
-        return {"error": "Cliente no conectado"}
-    client = server.client_objs[data.username]
-    client.send(data.message)
 
-    return {"status": "Mensaje enviado"}
+    # Verificar que el cliente existe
+    if data.username not in server.client_objs:
+        return {"error": "Cliente no conectado. Recarga la pagina e intenta de nuevo."}
+
+    # Enviar mensaje a traves del cliente
+    client = server.client_objs[data.username]
+
+    try:
+        success = client.send(data.message)
+        if success:
+            return {"status": "Mensaje enviado"}
+        else:
+            pass
+    except Exception as e:
+        return {"error": f"Error al enviar: {str(e)}"}
 
 @router.get("/history")
 def history(req: Request):

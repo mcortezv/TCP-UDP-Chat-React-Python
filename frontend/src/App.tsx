@@ -1,6 +1,6 @@
 import Hero from "./pages/Hero";
 import Chat from "./pages/Chat";
-import Config from "./pages/Server";
+import Server from "./pages/Server";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 export default function App() {
@@ -9,7 +9,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Hero />} />
         <Route path="/chat" element={<Chat />} />
-        <Route path="/server" element={<Config />} />
+        <Route path="/server" element={<Server />} />
       </Routes>
     </BrowserRouter>
   );
