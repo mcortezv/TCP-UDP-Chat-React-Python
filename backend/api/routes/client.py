@@ -31,7 +31,7 @@ def send(req: Request, data: MessageData):
         return {"error": "Cliente no conectado"}
     client = server.client_objs[data.username]
     client.send(data.message)
-    server.history.append(f"{data.username}: {data.message}")
+
     return {"status": "Mensaje enviado"}
 
 @router.get("/history")
