@@ -8,6 +8,7 @@ class TCPClient:
     Clase que represta un objeto tipo Cliente TCP, permite iniciar
     una conexión, recibir y enviar mensajes.
     """
+
     def __init__(self, username, host, port, controller):
         """
         Contructor de la clase TCPClient
@@ -24,6 +25,7 @@ class TCPClient:
         self.running = True
         self.recv_thread = None
         self.connect_lock = threading.Lock()
+        self.dm_queue = []  # Cola de DMs recibidos
 
     def start(self):
         """
@@ -63,8 +65,18 @@ class TCPClient:
                 data = self.sock.recv(1024)
                 if not data:
                     break
-                # Los mensajes ya estan en el historial del servidor
+
+                decoded = data.decode()
+                print(f"[TCP Client {self.username}] Mensaje recibido: {decoded}")
+
+                # Procesar mensajes DM recibidos
+                if decoded.startswith("DM:") or decoded.startswith("DM_SENT:"):
+                    # Este es un DM, el frontend lo manejará via WebSocket o polling
+                    # Por ahora solo lo logueamos
+                    print(f"[TCP Client {self.username}] DM procesado")
+
             except Exception as e:
+                print(f"[TCP Client {self.username}] Error recibiendo: {e}")
                 break
         try:
             if self.sock:
@@ -73,17 +85,30 @@ class TCPClient:
             pass
         self.sock = None
 
-    def send(self, message: str):
+    def send(self, message: str, recipient: str = "all"):
         """
         Funcion que permite enviar mensajes en el servidor
         :param message: mensaje que se envia
+        :param recipient: destinatario del mensaje ("all" para broadcast)
+        :return: True si se envió correctamente, False en caso contrario
         """
-        payload = f"{self.username}: {message}|{time.time()}".encode()
-        if self.sock:
-            try:
-                self.sock.sendall(payload)
-            except Exception as e:
-                self.sock = None
+        if not self.sock:
+            print(f"[TCP Client] Error: Socket no disponible")
+            return False
+
+        try:
+            # Formato: DESTINATARIO:REMITENTE: mensaje|timestamp
+            if recipient == "all":
+                payload = f"ALL:{self.username}: {message}|{time.time()}".encode()
+            else:
+                payload = f"DM:{recipient}:{self.username}: {message}|{time.time()}".encode()
+
+            self.sock.sendall(payload)
+            return True
+        except Exception as e:
+            print(f"[TCP Client] Error enviando mensaje: {e}")
+            self.sock = None
+            return False
 
     def stop(self):
         """

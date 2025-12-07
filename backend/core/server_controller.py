@@ -8,11 +8,13 @@ import threading
 Modulo controlador del servidor.
 """
 
+
 class ServerController:
     """
     Clase que representa el controlador del servidor.
     Permite configurarlo y ejecutarlo.
     """
+
     def __init__(self):
         """
         Constructor del controlador del servidor.
@@ -29,6 +31,7 @@ class ServerController:
         self.clients = set()
         self.client_objs = {}
         self.history = []
+        self.user_dms = {}  # Diccionario para almacenar DMs por usuario: {dm_username: [mensajes]}
         self._lock = threading.RLock()
 
     def run(self, protocol: str):
@@ -139,3 +142,15 @@ class ServerController:
                 del self.client_objs[username]
             if username in self.clients:
                 self.clients.remove(username)
+
+    def get_user_dms(self, username: str):
+        """
+        Obtiene y limpia los DMs de un usuario
+        :param username: nombre del usuario
+        :return: lista de DMs
+        """
+        dm_key = f"dm_{username}"
+        dms = self.user_dms.get(dm_key, []).copy()
+        if dm_key in self.user_dms:
+            self.user_dms[dm_key].clear()
+        return dms
