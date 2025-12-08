@@ -109,7 +109,7 @@ class UDPServer(threading.Thread):
                             if dm_key not in self.controller.user_dms:
                                 self.controller.user_dms[dm_key] = []
                             self.controller.user_dms[dm_key].append(sender_and_msg)
-                            print(f"[UDP Server] ✓ DM guardado para {recipient}")
+                            print(f"[UDP Server] DM guardado para {recipient}")
 
                             # También notificar al socket si está conectado (para UDP)
                             recipient_addr = self.username_to_addr.get(recipient)
@@ -118,18 +118,18 @@ class UDPServer(threading.Thread):
                                 try:
                                     dm_msg = f"DM:{sender_and_msg}".encode()
                                     self.server.sendto(dm_msg, recipient_addr)
-                                    print(f"[UDP Server] ✓ DM enviado exitosamente a {recipient} en {recipient_addr}")
+                                    print(f"[UDP Server] DM enviado exitosamente a {recipient} en {recipient_addr}")
                                 except Exception as e:
-                                    print(f"[UDP Server] ✗ Error enviando DM: {e}")
+                                    print(f"[UDP Server] Error enviando DM: {e}")
                                     self._remove_client(recipient_addr)
 
                             # Enviar confirmación al remitente
                             try:
                                 confirm_msg = f"DM_SENT:{sender_and_msg}".encode()
                                 self.server.sendto(confirm_msg, addr)
-                                print(f"[UDP Server] ✓ Confirmación enviada al remitente")
+                                print(f"[UDP Server] Confirmación enviada al remitente")
                             except Exception as e:
-                                print(f"[UDP Server] ✗ Error enviando confirmación: {e}")
+                                print(f"[UDP Server] Error enviando confirmación: {e}")
 
                 except Exception as e:
                     print(f"[UDP Server] Error decodificando: {e}")
