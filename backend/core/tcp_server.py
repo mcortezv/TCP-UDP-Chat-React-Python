@@ -83,32 +83,32 @@ class TCPServer(threading.Thread):
                     if dm_key not in self.controller.user_dms:
                         self.controller.user_dms[dm_key] = []
                     self.controller.user_dms[dm_key].append(sender_and_msg)
-                    print(f"[TCP Server] ✓ DM guardado para {recipient}")
+                    print(f"[TCP Server] DM guardado para {recipient}")
 
                     # También notificar al socket si está conectado (para TCP)
                     recipient_sock = None
                     for sock, username in self.clients.items():
                         if username == recipient:
                             recipient_sock = sock
-                            print(f"[TCP Server] ✓ Destinatario encontrado!")
+                            print(f"[TCP Server] Destinatario encontrado!")
                             break
 
                     if recipient_sock:
                         try:
                             dm_msg = f"DM:{sender_and_msg}".encode()
                             recipient_sock.sendall(dm_msg)
-                            print(f"[TCP Server] ✓ DM enviado exitosamente a socket de {recipient}")
+                            print(f"[TCP Server] DM enviado exitosamente a socket de {recipient}")
                         except Exception as e:
-                            print(f"[TCP Server] ✗ Error enviando DM a socket: {e}")
+                            print(f"[TCP Server] Error enviando DM a socket: {e}")
                             self._remove_client(recipient_sock)
 
                     # Enviar confirmación al remitente
                     try:
                         confirm_msg = f"DM_SENT:{sender_and_msg}".encode()
                         source_sock.sendall(confirm_msg)
-                        print(f"[TCP Server] ✓ Confirmación enviada al remitente")
+                        print(f"[TCP Server] Confirmación enviada al remitente")
                     except Exception as e:
-                        print(f"[TCP Server] ✗ Error enviando confirmación: {e}")
+                        print(f"[TCP Server] Error enviando confirmación: {e}")
         except Exception as e:
             print(f"[TCP Server] Error en broadcast: {e}")
 
