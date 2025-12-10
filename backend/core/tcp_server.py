@@ -1,20 +1,20 @@
 import socket
 import threading
+import asyncio
 
 """
 Modulo que reprsenta un servidor TCP
 """
 
+
 class TCPServer(threading.Thread):
     """
     Clase que representa un servidor TCP, permite crearlo correrlo y detenerlo.
     """
+
     def __init__(self, ip, port, controller):
         """
         Constructor de la clase.
-        :param ip: direccion ip del servidor.
-        :param port: puerto del servidor.
-        :param controller: controla del servidor.
         """
         super().__init__(daemon=True)
         self.ip = ip
@@ -41,81 +41,104 @@ class TCPServer(threading.Thread):
     def broadcast(self, message, source_sock):
         """
         Funcion que envia un mensaje a todos los clientes conectados.
-        :param message: mensaje a enviar.
-        :param source_sock: socket del emisor.
         """
         try:
             decoded = message.decode()
             print(f"[TCP Server] Mensaje recibido: {decoded}")
 
-            # Parsear el mensaje para determinar el tipo
             if decoded.startswith("ALL:"):
                 # Mensaje broadcast - formato: ALL:username: mensaje|timestamp
                 msg_content = decoded[4:]  # Remover "ALL:"
-                print(f"[TCP Server] Broadcast: {msg_content}")
+                parts = msg_content.split(":", 1)
 
-                # SOLO los mensajes broadcast van al historial público
-                self.controller.history.append(msg_content)
+                if len(parts) >= 2:
+                    username = parts[0].strip()
+                    rest = parts[1].strip()
 
-                # Enviar a todos excepto el remitente
-                for c in list(self.clients.keys()):
-                    if c != source_sock:
-                        try:
-                            c.sendall(message)
-                        except:
-                            self._remove_client(c)
+                    # Dividir mensaje y timestamp
+                    if "|" in rest:
+                        text, timestamp_str = rest.rsplit("|", 1)
+                        timestamp = float(timestamp_str)
+                    else:
+                        text = rest
+                        timestamp = 0.0
+
+                    # Añadir al historial estructurado
+                    message_obj = self.controller.add_message_to_history(username, text, timestamp)
+
+                    # Notificar por WebSocket
+                    try:
+                        from api.ws_server import notify_new_message
+                        asyncio.run(notify_new_message(message_obj))
+                    except:
+                        pass
+
+                    # Enviar a todos los sockets TCP excepto el remitente
+                    for c in list(self.clients.keys()):
+                        if c != source_sock:
+                            try:
+                                c.sendall(message)
+                            except:
+                                self._remove_client(c)
 
             elif decoded.startswith("DM:"):
                 # Mensaje directo - formato: DM:destinatario:remitente: mensaje|timestamp
                 parts = decoded.split(":", 3)
-                print(f"[TCP Server] Partes del DM: {parts}")
 
                 if len(parts) >= 4:
                     recipient = parts[1]
-                    sender_and_msg = ":".join(parts[2:])  # remitente: mensaje|timestamp
+                    sender = parts[2]
+                    rest = parts[3].strip()
 
-                    sender_username = self.clients.get(source_sock, 'unknown')
-                    print(f"[TCP Server] DM de '{sender_username}' para '{recipient}'")
-                    print(f"[TCP Server] Contenido: {sender_and_msg}")
+                    # Dividir mensaje y timestamp
+                    if "|" in rest:
+                        text, timestamp_str = rest.rsplit("|", 1)
+                        timestamp = float(timestamp_str)
+                    else:
+                        text = rest
+                        timestamp = 0.0
 
-                    # Guardar DM en una lista específica del usuario destinatario
-                    dm_key = f"dm_{recipient}"
-                    if dm_key not in self.controller.user_dms:
-                        self.controller.user_dms[dm_key] = []
-                    self.controller.user_dms[dm_key].append(sender_and_msg)
-                    print(f"[TCP Server] DM guardado para {recipient}")
+                    print(f"[TCP Server] DM de '{sender}' para '{recipient}': {text}")
 
-                    # También notificar al socket si está conectado (para TCP)
+                    # Guardar DM estructurado
+                    dm_obj = self.controller.add_dm_to_user(recipient, sender, text, timestamp)
+
+                    # Notificar por WebSocket
+                    try:
+                        from api.ws_server import notify_dm
+                        asyncio.run(notify_dm(sender, recipient, dm_obj))
+                    except:
+                        pass
+
+                    # Enviar al socket TCP del destinatario si está conectado
                     recipient_sock = None
                     for sock, username in self.clients.items():
                         if username == recipient:
                             recipient_sock = sock
-                            print(f"[TCP Server] Destinatario encontrado!")
                             break
 
                     if recipient_sock:
                         try:
-                            dm_msg = f"DM:{sender_and_msg}".encode()
+                            dm_msg = f"DM:{sender}: {text}|{timestamp}".encode()
                             recipient_sock.sendall(dm_msg)
-                            print(f"[TCP Server] DM enviado exitosamente a socket de {recipient}")
+                            print(f"[TCP Server] DM enviado a socket de {recipient}")
                         except Exception as e:
-                            print(f"[TCP Server] Error enviando DM a socket: {e}")
+                            print(f"[TCP Server] Error enviando DM: {e}")
                             self._remove_client(recipient_sock)
 
-                    # Enviar confirmación al remitente
+                    # Confirmar al remitente
                     try:
-                        confirm_msg = f"DM_SENT:{sender_and_msg}".encode()
+                        confirm_msg = f"DM_SENT:{sender}: {text}|{timestamp}".encode()
                         source_sock.sendall(confirm_msg)
-                        print(f"[TCP Server] Confirmación enviada al remitente")
                     except Exception as e:
                         print(f"[TCP Server] Error enviando confirmación: {e}")
+
         except Exception as e:
             print(f"[TCP Server] Error en broadcast: {e}")
 
     def _remove_client(self, conn):
         """
         Funcion auxiliar para remover un cliente
-        :param conn: socket del cliente a remover
         """
         try:
             if conn in self.clients:
@@ -127,8 +150,6 @@ class TCPServer(threading.Thread):
     def handle_client(self, conn, addr):
         """
         Manejador del cliente dentro de la conexion al servidor.
-        :param conn: socket que representa la conexion al servidor.
-        :param addr: direccion ip del cliente.
         """
         username = None
 
@@ -140,24 +161,34 @@ class TCPServer(threading.Thread):
 
                 decoded = data.decode()
 
-                # Manejar registro de usuario
                 if decoded.startswith("CONECTADO:"):
                     username = decoded.split(":", 1)[1]
                     self.clients[conn] = username
                     print(f"[TCP Server] Usuario {username} conectado")
+
+                    # Notificar actualización de clientes
+                    try:
+                        from api.ws_server import manager
+                        asyncio.run(manager.send_clients_update())
+                    except:
+                        pass
                     continue
 
-                # Procesar mensaje normal
                 self.broadcast(data, conn)
 
             except Exception as e:
                 print(f"[TCP Server] Error manejando cliente: {e}")
                 break
 
-        # Limpiar al desconectar
         self._remove_client(conn)
         if username:
             print(f"[TCP Server] Usuario {username} desconectado")
+            # Notificar actualización de clientes
+            try:
+                from api.ws_server import manager
+                asyncio.run(manager.send_clients_update())
+            except:
+                pass
 
     def stop(self):
         """

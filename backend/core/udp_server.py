@@ -1,5 +1,6 @@
 import socket
 import threading
+import asyncio
 
 """
 Modulo que reprsenta un servidor UDP
@@ -14,9 +15,6 @@ class UDPServer(threading.Thread):
     def __init__(self, ip, port, controller):
         """
         Constructor de la clase.
-        :param ip: direccion ip del servidor.
-        :param port: puerto del servidor.
-        :param controller: controla del servidor.
         """
         super().__init__(daemon=True)
         self.ip = ip
@@ -49,7 +47,6 @@ class UDPServer(threading.Thread):
         if not self.running or not self.server:
             return
         try:
-            # Establecer timeout para que el servidor pueda detenerse
             self.server.settimeout(1.0)
         except Exception as e:
             self.running = False
@@ -67,6 +64,13 @@ class UDPServer(threading.Thread):
                         self.clients[addr] = username
                         self.username_to_addr[username] = addr
                         print(f"[UDP Server] Usuario {username} conectado desde {addr}")
+
+                        # Notificar actualización de clientes
+                        try:
+                            from api.ws_server import manager
+                            asyncio.run(manager.send_clients_update())
+                        except:
+                            pass
                         continue
 
                     # Registrar cliente si no está registrado
@@ -77,55 +81,85 @@ class UDPServer(threading.Thread):
                     # Parsear el mensaje
                     if decoded.startswith("ALL:"):
                         # Mensaje broadcast
-                        msg_content = decoded[4:]
-                        print(f"[UDP Server] Broadcast: {msg_content}")
+                        msg_content = decoded[4:]  # Remover "ALL:"
+                        parts = msg_content.split(":", 1)
 
-                        # SOLO los mensajes broadcast van al historial público
-                        self.controller.history.append(msg_content)
+                        if len(parts) >= 2:
+                            username = parts[0].strip()
+                            rest = parts[1].strip()
 
-                        # Broadcast a todos menos al remitente
-                        for client_addr in list(self.clients.keys()):
-                            if client_addr != addr:
-                                try:
-                                    self.server.sendto(data, client_addr)
-                                except Exception as e:
-                                    self._remove_client(client_addr)
+                            # Dividir mensaje y timestamp
+                            if "|" in rest:
+                                text, timestamp_str = rest.rsplit("|", 1)
+                                timestamp = float(timestamp_str)
+                            else:
+                                text = rest
+                                timestamp = 0.0
+
+                            print(f"[UDP Server] Broadcast de {username}: {text}")
+
+                            # Añadir al historial estructurado
+                            message_obj = self.controller.add_message_to_history(username, text, timestamp)
+
+                            # Notificar por WebSocket
+                            try:
+                                from api.ws_server import notify_new_message
+                                asyncio.run(notify_new_message(message_obj))
+                            except:
+                                pass
+
+                            # Broadcast a todos menos al remitente
+                            for client_addr in list(self.clients.keys()):
+                                if client_addr != addr:
+                                    try:
+                                        self.server.sendto(data, client_addr)
+                                    except Exception as e:
+                                        self._remove_client(client_addr)
 
                     elif decoded.startswith("DM:"):
                         # Mensaje directo - formato: DM:destinatario:remitente: mensaje|timestamp
                         parts = decoded.split(":", 3)
-                        print(f"[UDP Server] Partes del DM: {parts}")
 
                         if len(parts) >= 4:
                             recipient = parts[1]
-                            sender_and_msg = ":".join(parts[2:])  # remitente: mensaje|timestamp
+                            sender = parts[2]
+                            rest = parts[3].strip()
 
-                            sender_username = self.clients.get(addr, 'unknown')
-                            print(f"[UDP Server] DM de '{sender_username}' para '{recipient}'")
-                            print(f"[UDP Server] Contenido: {sender_and_msg}")
+                            # Dividir mensaje y timestamp
+                            if "|" in rest:
+                                text, timestamp_str = rest.rsplit("|", 1)
+                                timestamp = float(timestamp_str)
+                            else:
+                                text = rest
+                                timestamp = 0.0
 
-                            # Guardar DM en una lista específica del usuario destinatario
-                            dm_key = f"dm_{recipient}"
-                            if dm_key not in self.controller.user_dms:
-                                self.controller.user_dms[dm_key] = []
-                            self.controller.user_dms[dm_key].append(sender_and_msg)
-                            print(f"[UDP Server] DM guardado para {recipient}")
+                            print(f"[UDP Server] DM de '{sender}' para '{recipient}': {text}")
 
-                            # También notificar al socket si está conectado (para UDP)
+                            # Guardar DM estructurado
+                            dm_obj = self.controller.add_dm_to_user(recipient, sender, text, timestamp)
+
+                            # Notificar por WebSocket
+                            try:
+                                from api.ws_server import notify_dm
+                                asyncio.run(notify_dm(sender, recipient, dm_obj))
+                            except:
+                                pass
+
+                            # Enviar al destinatario UDP si está conectado
                             recipient_addr = self.username_to_addr.get(recipient)
 
                             if recipient_addr:
                                 try:
-                                    dm_msg = f"DM:{sender_and_msg}".encode()
+                                    dm_msg = f"DM:{sender}: {text}|{timestamp}".encode()
                                     self.server.sendto(dm_msg, recipient_addr)
-                                    print(f"[UDP Server] DM enviado exitosamente a {recipient} en {recipient_addr}")
+                                    print(f"[UDP Server] DM enviado a {recipient} en {recipient_addr}")
                                 except Exception as e:
                                     print(f"[UDP Server] Error enviando DM: {e}")
                                     self._remove_client(recipient_addr)
 
                             # Enviar confirmación al remitente
                             try:
-                                confirm_msg = f"DM_SENT:{sender_and_msg}".encode()
+                                confirm_msg = f"DM_SENT:{sender}: {text}|{timestamp}".encode()
                                 self.server.sendto(confirm_msg, addr)
                                 print(f"[UDP Server] Confirmación enviada al remitente")
                             except Exception as e:
@@ -136,7 +170,6 @@ class UDPServer(threading.Thread):
                     continue
 
             except socket.timeout:
-                # Timeout, es normal, continua el bucle
                 continue
             except Exception as e:
                 if self.running:
@@ -146,7 +179,6 @@ class UDPServer(threading.Thread):
     def _remove_client(self, addr):
         """
         Funcion auxiliar para remover un cliente
-        :param addr: dirección del cliente a remover
         """
         try:
             if addr in self.clients:
@@ -154,6 +186,13 @@ class UDPServer(threading.Thread):
                 del self.clients[addr]
                 if username in self.username_to_addr:
                     del self.username_to_addr[username]
+
+                # Notificar actualización de clientes
+                try:
+                    from api.ws_server import manager
+                    asyncio.run(manager.send_clients_update())
+                except:
+                    pass
         except:
             pass
 

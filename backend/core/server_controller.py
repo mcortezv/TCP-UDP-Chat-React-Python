@@ -143,6 +143,62 @@ class ServerController:
             if username in self.clients:
                 self.clients.remove(username)
 
+    def add_message_to_history(self, username: str, text: str, timestamp: float):
+        """
+        Añade un mensaje broadcast al historial
+        :param username: usuario que envió el mensaje
+        :param text: contenido del mensaje
+        :param timestamp: timestamp del mensaje
+        :return: objeto del mensaje para notificaciones
+        """
+        message_obj = {
+            "user": username,
+            "text": text,
+            "timestamp": timestamp,
+            "isDM": False
+        }
+
+        with self._lock:
+            self.history.append(message_obj)
+
+        print(f"[Controller] Mensaje agregado al historial: {username}: {text}")
+        return message_obj
+
+    def add_dm_to_user(self, recipient: str, sender: str, text: str, timestamp: float):
+        """
+        Añade un DM al buzón del usuario destinatario
+        :param recipient: usuario destinatario
+        :param sender: usuario remitente
+        :param text: contenido del mensaje
+        :param timestamp: timestamp del mensaje
+        :return: objeto del mensaje para notificaciones
+        """
+        dm_obj = {
+            "user": sender,
+            "text": text,
+            "timestamp": timestamp,
+            "isDM": True,
+            "dmRecipient": recipient
+        }
+
+        dm_key = f"dm_{recipient}"
+
+        with self._lock:
+            if dm_key not in self.user_dms:
+                self.user_dms[dm_key] = []
+            self.user_dms[dm_key].append(dm_obj)
+
+        print(f"[Controller] DM guardado para {recipient}: {sender} -> {text}")
+        return dm_obj
+
+    def get_chat_history(self):
+        """
+        Obtiene el historial completo de mensajes broadcast
+        :return: lista de mensajes
+        """
+        with self._lock:
+            return self.history.copy()
+
     def get_user_dms(self, username: str):
         """
         Obtiene y limpia los DMs de un usuario
@@ -150,7 +206,8 @@ class ServerController:
         :return: lista de DMs
         """
         dm_key = f"dm_{username}"
-        dms = self.user_dms.get(dm_key, []).copy()
-        if dm_key in self.user_dms:
-            self.user_dms[dm_key].clear()
+        with self._lock:
+            dms = self.user_dms.get(dm_key, []).copy()
+            if dm_key in self.user_dms:
+                self.user_dms[dm_key].clear()
         return dms
