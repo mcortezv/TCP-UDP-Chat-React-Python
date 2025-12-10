@@ -1,130 +1,146 @@
 import { useEffect, useRef, useState } from "react";
 
-function formatMessages(history: string[], currentUsername: string) {
-
-    const formatted = history.map((raw, index) => {
-        const [msg, ts] = raw.includes("|") ? raw.split("|") : [raw, null];
-        const firstColon = msg.indexOf(":");
-        if (firstColon === -1) {
-            return null;
-        }
-
-        const user = msg.slice(0, firstColon).trim();
-        const text = msg.slice(firstColon + 1).trim();
-        const isMyMessage = user === currentUsername;
-
-        return {
-            id: `broadcast-${index}`,
-            user,
-            text,
-            timestamp: ts ? new Date(parseFloat(ts) * 1000) : null,
-            isDM: false,
-            dmRecipient: null,
-            shouldShow: true,
-            isMyMessage
-        };
-    }).filter(m => m);
-    return formatted;
+interface Message {
+    id: string;
+    user: string;
+    text: string;
+    timestamp: number;
+    isDM: boolean;
+    dmRecipient?: string;
+    isMyMessage: boolean;
 }
 
 export default function Chat() {
     const [message, setMessage] = useState("");
-    const [messages, setMessages] = useState<any[]>([]);
-    const [dmMessages, setDmMessages] = useState<any[]>([]);
+    const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [availableClients, setAvailableClients] = useState<string[]>([]);
     const [selectedRecipient, setSelectedRecipient] = useState("all");
+    const [wsConnected, setWsConnected] = useState(false);
+
     const username = sessionStorage.getItem("username") || "Anon";
     const bottomRef = useRef<HTMLDivElement>(null);
-    const lastHistoryLength = useRef(0);
-    const dmIdCounter = useRef(0);
+    const wsRef = useRef<WebSocket | null>(null);
+    const messageIdCounter = useRef(0);
+
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    async function loadHistory() {
-        try {
-            const res = await fetch("http://localhost:8000/client/history");
-            if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`);
-            }
-            const data = await res.json();
-            if (data.history.length !== lastHistoryLength.current) {
-                setMessages(formatMessages(data.history, username));
-                lastHistoryLength.current = data.history.length;
-            }
-            setError("");
-        } catch (err) {
-            console.error("Error al cargar historial:", err);
-        }
-    }
-
-    async function loadClients() {
-        try {
-            const res = await fetch("http://localhost:8000/client/clients");
-            if (!res.ok) return;
-            const data = await res.json();
-            setAvailableClients(data.clients.filter((c: string) => c !== username));
-        } catch (err) {
-            console.error("Error al cargar clientes:", err);
-        }
-    }
-
-    async function loadDMs() {
-        try {
-            const res = await fetch(`http://localhost:8000/client/dms/${username}`);
-            if (!res.ok) return;
-            const data = await res.json();
-
-            if (data.dms && data.dms.length > 0) {
-                const newDMs = data.dms.map((dmRaw: string) => {
-                    const [msg, ts] = dmRaw.includes("|") ? dmRaw.split("|") : [dmRaw, null];
-                    const firstColon = msg.indexOf(":");
-                    if (firstColon === -1) return null;
-
-                    const sender = msg.slice(0, firstColon).trim();
-                    const text = msg.slice(firstColon + 1).trim();
-
-                    return {
-                        id: `dm-received-${dmIdCounter.current++}`,
-                        user: sender,
-                        text: text,
-                        timestamp: ts ? new Date(parseFloat(ts) * 1000) : new Date(),
-                        isDM: true,
-                        dmRecipient: username,
-                        shouldShow: true,
-                        isMyMessage: false
-                    };
-                }).filter((dm: any) => dm !== null);
-
-                if (newDMs.length > 0) {
-                    setDmMessages(prev => [...prev, ...newDMs]);
-                }
-            }
-        } catch (err) {
-            console.error("Error al cargar DMs:", err);
-        }
-    }
-
+    // Conectar WebSocket
     useEffect(() => {
-        loadHistory();
-        loadClients();
-        loadDMs();
-        const interval = setInterval(() => {
-            loadHistory();
-            loadClients();
-            loadDMs();
-        }, 800);
-        return () => clearInterval(interval);
-    }, []);
+        const ws = new WebSocket(`ws://localhost:8000/ws/${username}`);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+            console.log("[WS] Conectado");
+            setWsConnected(true);
+            setError("");
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log("[WS] Mensaje recibido:", data);
+
+                switch (data.type) {
+                    case "history":
+                        // Cargar historial inicial
+                        if (data.messages && Array.isArray(data.messages)) {
+                            const historyMessages = data.messages.map((msg: any) => ({
+                                id: `history-${messageIdCounter.current++}`,
+                                user: msg.user,
+                                text: msg.text,
+                                timestamp: msg.timestamp,
+                                isDM: msg.isDM || false,
+                                dmRecipient: msg.dmRecipient,
+                                isMyMessage: msg.user === username
+                            }));
+                            setMessages(historyMessages);
+                            console.log(`[WS] Historial cargado: ${historyMessages.length} mensajes`);
+                        }
+                        break;
+
+                    case "new_message":
+                        // Nuevo mensaje broadcast
+                        const newMsg: Message = {
+                            id: `msg-${messageIdCounter.current++}`,
+                            user: data.message.user,
+                            text: data.message.text,
+                            timestamp: data.message.timestamp,
+                            isDM: false,
+                            isMyMessage: data.message.user === username
+                        };
+                        setMessages(prev => [...prev, newMsg]);
+                        console.log(`[WS] Nuevo mensaje broadcast: ${data.message.user}: ${data.message.text}`);
+                        break;
+
+                    case "new_dm":
+                        // Nuevo DM recibido
+                        const newDM: Message = {
+                            id: `dm-${messageIdCounter.current++}`,
+                            user: data.message.user,
+                            text: data.message.text,
+                            timestamp: data.message.timestamp,
+                            isDM: true,
+                            dmRecipient: data.message.dmRecipient,
+                            isMyMessage: false
+                        };
+                        setMessages(prev => [...prev, newDM]);
+                        console.log(`[WS] Nuevo DM recibido de ${data.message.user}`);
+                        break;
+
+                    case "dm_sent":
+                        // Confirmación de DM enviado
+                        const sentDM: Message = {
+                            id: `dm-sent-${messageIdCounter.current++}`,
+                            user: username,
+                            text: data.message.text,
+                            timestamp: data.message.timestamp,
+                            isDM: true,
+                            dmRecipient: data.message.dmRecipient,
+                            isMyMessage: true
+                        };
+                        setMessages(prev => [...prev, sentDM]);
+                        console.log(`[WS] DM enviado confirmado a ${data.message.dmRecipient}`);
+                        break;
+
+                    case "clients_update":
+                        // Actualización de lista de clientes
+                        const filteredClients = data.clients.filter((c: string) => c !== username);
+                        setAvailableClients(filteredClients);
+                        console.log(`[WS] Clientes actualizados: ${data.clients.length}`);
+                        break;
+
+                    default:
+                        console.warn("[WS] Tipo de mensaje desconocido:", data.type);
+                }
+            } catch (err) {
+                console.error("[WS] Error procesando mensaje:", err);
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error("[WS] Error:", error);
+            setError("Error de conexión con el servidor");
+            setWsConnected(false);
+        };
+
+        ws.onclose = () => {
+            console.log("[WS] Desconectado");
+            setWsConnected(false);
+        };
+
+        return () => {
+            ws.close();
+        };
+    }, [username]);
 
     async function handleSend() {
         if (!message.trim()) return;
         setLoading(true);
         setError("");
-
-        const isDM = selectedRecipient !== "all";
 
         try {
             const res = await fetch("http://localhost:8000/client/send", {
@@ -136,38 +152,41 @@ export default function Chat() {
                     recipient: selectedRecipient
                 }),
             });
+
             if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
+
             const data = await res.json();
+
             if (data.error) {
                 setError(data.error);
                 alert("Error: " + data.error);
             } else {
-                // Si es DM, agregarlo localmente
-                if (isDM) {
-                    const newDM = {
-                        id: `dm-sent-${dmIdCounter.current++}`,
+                // Para mensajes broadcast, agregar localmente solo si no viene por WebSocket
+                if (selectedRecipient === "all") {
+                    const newMsg: Message = {
+                        id: `msg-local-${messageIdCounter.current++}`,
                         user: username,
                         text: message.trim(),
-                        timestamp: new Date(),
-                        isDM: true,
-                        dmRecipient: selectedRecipient,
-                        shouldShow: true,
+                        timestamp: Date.now() / 1000,
+                        isDM: false,
                         isMyMessage: true
                     };
-                    setDmMessages(prev => [...prev, newDM]);
+                    setMessages(prev => [...prev, newMsg]);
                 }
-
+                // Para DMs, el WebSocket enviará la confirmación
                 setMessage("");
-                setTimeout(loadHistory, 100);
             }
         } catch (err) {
             console.error("Error enviando mensaje:", err);
+            setError("Error al enviar el mensaje");
         } finally {
             setLoading(false);
         }
     }
+
+    const sortedMessages = [...messages].sort((a, b) => a.timestamp - b.timestamp);
 
     return (
         <div className="mx-auto w-[40%] mt-20 flex flex-col gap-4">
@@ -178,57 +197,52 @@ export default function Chat() {
                 </div>
             )}
 
-            <div className="text-right px-4 py-3 rounded bg-white/70 shadow">
+            <div className="text-right px-4 py-3 rounded bg-white/70 shadow flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className="text-sm">{wsConnected ? 'Conectado' : 'Desconectado'}</span>
+                </div>
                 <p className="text-sm">
                     <strong>Usuario:</strong> {username}
                 </p>
             </div>
 
             <div className="flex flex-col gap-3 p-4 h-[60vh] overflow-y-auto bg-white/50">
-                {messages.length === 0 && dmMessages.length === 0 ? (
+                {sortedMessages.length === 0 ? (
                     <div className="text-center text-gray-500 mt-10">
                         <p>No hay mensajes aún</p>
                     </div>
                 ) : (
-                    [...messages, ...dmMessages]
-                        .sort((a, b) => {
-                            const timeA = a.timestamp ? a.timestamp.getTime() : 0;
-                            const timeB = b.timestamp ? b.timestamp.getTime() : 0;
-                            return timeA - timeB;
-                        })
-                        .map((m) => {
-                            return (
-                                <div
-                                    key={m.id}
-                                    className={`max-w-[70%] px-4 py-2 rounded-2xl shadow break-words
-                                        ${m.isMyMessage
-                                            ? "self-end bg-blue-600 text-white"
-                                            : "self-start bg-white border text-gray-900"
-                                        }
-                                        ${m.isDM ? "border-2 border-gray-400" : ""}
-                                    `}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-semibold text-sm">{m.user}</p>
-                                        {m.isDM && (
-                                            <span className={`text-xs px-2 py-0.5 rounded ${m.isMyMessage
-                                                ? "bg-gray-300 text-gray-900"
-                                                : "bg-gray-200 text-gray-800"
-                                                }`}>
-                                                {m.isMyMessage ? `${m.dmRecipient}` : 'Privado'}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p>{m.text}</p>
-
-                                    {m.timestamp && (
-                                        <span className="text-[10px] opacity-60 block mt-1">
-                                            {m.timestamp.toLocaleTimeString()}
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        })
+                    sortedMessages.map((m) => (
+                        <div
+                            key={m.id}
+                            className={`max-w-[70%] px-4 py-2 rounded-2xl shadow break-words
+                                ${m.isMyMessage
+                                    ? "self-end bg-blue-600 text-white"
+                                    : "self-start bg-white border text-gray-900"
+                                }
+                                ${m.isDM ? "border-2 border-gray-400" : ""}
+                            `}
+                        >
+                            <div className="flex items-center gap-2">
+                                <p className="font-semibold text-sm">{m.user}</p>
+                                {m.isDM && (
+                                    <span className={`text-xs px-2 py-0.5 rounded ${m.isMyMessage
+                                        ? "bg-gray-300 text-gray-900"
+                                        : "bg-gray-200 text-gray-800"
+                                        }`}>
+                                        {m.isMyMessage ? `→ ${m.dmRecipient}` : 'Privado'}
+                                    </span>
+                                )}
+                            </div>
+                            <p>{m.text}</p>
+                            {m.timestamp > 0 && (
+                                <span className="text-[10px] opacity-60 block mt-1">
+                                    {new Date(m.timestamp * 1000).toLocaleTimeString()}
+                                </span>
+                            )}
+                        </div>
+                    ))
                 )}
                 <div ref={bottomRef}></div>
             </div>
@@ -255,7 +269,7 @@ export default function Chat() {
                         value={message}
                         rows={1}
                         placeholder={selectedRecipient === "all" ? "Mensaje para todos" : `Mensaje directo para ${selectedRecipient}`}
-                        disabled={loading}
+                        disabled={loading || !wsConnected}
                         className="flex-1 min-h-full px-3 py-2 text-black border-none outline-none resize-none focus:outline-none"
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyDown={(e) => {
@@ -268,7 +282,7 @@ export default function Chat() {
 
                     <button
                         onClick={handleSend}
-                        disabled={loading || !message.trim()}
+                        disabled={loading || !message.trim() || !wsConnected}
                         className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         {loading ? (
