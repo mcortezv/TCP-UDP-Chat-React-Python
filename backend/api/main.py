@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from core.server_controller import ServerController
-from routes.server import router as server_router
-from routes.client import router as client_router
-from routes.websocket import router as websocket_router  # Importar router WebSocket
+from api.routes.server import router as server_router
+from api.routes.client import router as client_router
+from api.routes.websocket import router as websocket_router
 
 """
 Modulo principal del sistema que permite ejecutar la api.
