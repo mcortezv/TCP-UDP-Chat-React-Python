@@ -1,57 +1,16 @@
-import { Typography, Card } from "@material-tailwind/react";
-import { Input } from "@material-tailwind/react";
-import { Button } from "@material-tailwind/react";
-import { useState } from "react";
+import { Typography, Card, Button } from "@material-tailwind/react";
 import { useNavigate } from "react-router-dom";
 
 
 export default function Hero() {
-    const [username, setUsername] = useState("");
+    const username = sessionStorage.getItem("username") ?? "";
     const navigate = useNavigate();
 
-
-    async function handleRegister(event: React.FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        const trimmedUsername = username.trim();
-        if (trimmedUsername === "") {
-            alert("El nombre de usuario no puede estar vacío");
-            return;
-        }
-        if (trimmedUsername.length < 3) {
-            alert("El nombre de usuario debe tener al menos 3 caracteres");
-            return;
-        }
-        if (trimmedUsername.length > 20) {
-            alert("El nombre de usuario no puede tener más de 20 caracteres");
-            return;
-        }
-        try {
-            const response = await fetch("http://localhost:8000/client/login", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    username: trimmedUsername,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data.error) {
-                alert("Error: " + data.error);
-            } else {
-                sessionStorage.setItem("username", trimmedUsername);
-                navigate("/chat");
-            }
-        } catch (error) {
-            alert("Error de conexión con el servidor");
-        }
+    function handleLogout() {
+        sessionStorage.removeItem("username");
+        navigate("/login");
     }
+
 
     return (
         <div className="relative grid min-h-[100vh] w-screen p-8">
@@ -66,27 +25,23 @@ export default function Hero() {
                     <div className="py-4 pl-4 pr-5">Carlos Alberto Gonzalez Vega</div>
                 </Card>
             </div>
+            <button
+                onClick={handleLogout}
+                className="absolute top-4 right-8 text-xs text-gray-500 hover:text-red-500 transition-colors"
+            >
+                Cerrar sesión ({username})
+            </button>
             <div className="flex-col gap-2 pt-32 pb-40 text-center">
                 <Typography variant="h1" color="blue-gray" className="text-8xl animate-float delay-2200">
                     Welcome to ING-CHAT
                 </Typography>
                 <Typography variant="lead" color="blue-gray" className="opacity-70 text-2xl mt-4">
-                    Ingresa tu nombre para identificarte y podrás enviar mensajes <br />
-                    visibles para los demás usuarios activos en el Chat.
+                    Bienvenido, <strong>{username}</strong>. Entra al chat y envía mensajes <br />
+                    visibles para los demás usuarios activos.
                 </Typography>
-                <form onSubmit={handleRegister}>
-                    <div className="w-80 mx-auto mt-8">
-                        <Input
-                            label="Nombre"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            maxLength={20}
-                        />
-                    </div>
-                    <div className="mx-auto mt-8 animate-pulse-slow">
-                        <Button className="w-48 h-12 rounded-full" type="submit">Entrar al Chat</Button>
-                    </div>
-                </form>
+                <div className="mx-auto mt-8 animate-pulse-slow">
+                    <Button className="w-48 h-12 rounded-full" onClick={() => navigate("/chat")} placeholder="">Entrar al Chat</Button>
+                </div>
             </div>
             <div className="hidden md:block absolute top-[14%] left-[19%] animate-float-slow delay-100">
                 <img

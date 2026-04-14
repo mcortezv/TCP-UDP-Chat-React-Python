@@ -28,112 +28,88 @@ export default function Chat() {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    // Conectar WebSocket
+    // Registrar cliente TCP/UDP y abrir WebSocket
     useEffect(() => {
-        const ws = new WebSocket(`ws://localhost:8000/ws/${username}`);
-        wsRef.current = ws;
+        let cancelled = false;
+        let ws: WebSocket | null = null;
 
-        ws.onopen = () => {
-            console.log("[WS] Conectado");
-            setWsConnected(true);
-            setError("");
-        };
+        const timer = setTimeout(() => {
+            if (cancelled) return;
 
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                console.log("[WS] Mensaje recibido:", data);
+            fetch("http://localhost:8000/client/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username }),
+            })
+                .then((r) => r.json())
+                .then((data) => {
+                    if (cancelled) return;
+                    if (data.error) { setError(data.error); return; }
 
-                switch (data.type) {
-                    case "history":
-                        // Cargar historial inicial
-                        if (data.messages && Array.isArray(data.messages)) {
-                            const historyMessages = data.messages.map((msg: any) => ({
-                                id: `history-${messageIdCounter.current++}`,
-                                user: msg.user,
-                                text: msg.text,
-                                timestamp: msg.timestamp,
-                                isDM: msg.isDM || false,
-                                dmRecipient: msg.dmRecipient,
-                                isMyMessage: msg.user === username
-                            }));
-                            setMessages(historyMessages);
-                            console.log(`[WS] Historial cargado: ${historyMessages.length} mensajes`);
-                        }
-                        break;
+                    ws = new WebSocket(`ws://localhost:8000/ws/${username}`);
+                    wsRef.current = ws;
 
-                    case "new_message":
-                        // Nuevo mensaje broadcast
-                        const newMsg: Message = {
-                            id: `msg-${messageIdCounter.current++}`,
-                            user: data.message.user,
-                            text: data.message.text,
-                            timestamp: data.message.timestamp,
-                            isDM: false,
-                            isMyMessage: data.message.user === username
-                        };
-                        setMessages(prev => [...prev, newMsg]);
-                        console.log(`[WS] Nuevo mensaje broadcast: ${data.message.user}: ${data.message.text}`);
-                        break;
+                    ws.onopen = () => { setWsConnected(true); setError(""); };
 
-                    case "new_dm":
-                        // Nuevo DM recibido
-                        const newDM: Message = {
-                            id: `dm-${messageIdCounter.current++}`,
-                            user: data.message.user,
-                            text: data.message.text,
-                            timestamp: data.message.timestamp,
-                            isDM: true,
-                            dmRecipient: data.message.dmRecipient,
-                            isMyMessage: false
-                        };
-                        setMessages(prev => [...prev, newDM]);
-                        console.log(`[WS] Nuevo DM recibido de ${data.message.user}`);
-                        break;
+                    ws.onmessage = (event) => {
+                        try {
+                            const msg = JSON.parse(event.data);
+                            switch (msg.type) {
+                                case "history":
+                                    if (msg.messages && Array.isArray(msg.messages)) {
+                                        setMessages(msg.messages.map((m: any) => ({
+                                            id: `history-${messageIdCounter.current++}`,
+                                            user: m.user, text: m.text,
+                                            timestamp: m.timestamp,
+                                            isDM: m.isDM || false,
+                                            dmRecipient: m.dmRecipient,
+                                            isMyMessage: m.user === username,
+                                        })));
+                                    }
+                                    break;
+                                case "new_message":
+                                    setMessages(prev => [...prev, {
+                                        id: `msg-${messageIdCounter.current++}`,
+                                        user: msg.message.user, text: msg.message.text,
+                                        timestamp: msg.message.timestamp,
+                                        isDM: false, isMyMessage: msg.message.user === username,
+                                    }]);
+                                    break;
+                                case "new_dm":
+                                    setMessages(prev => [...prev, {
+                                        id: `dm-${messageIdCounter.current++}`,
+                                        user: msg.message.user, text: msg.message.text,
+                                        timestamp: msg.message.timestamp,
+                                        isDM: true, dmRecipient: msg.message.dmRecipient,
+                                        isMyMessage: false,
+                                    }]);
+                                    break;
+                                case "dm_sent":
+                                    setMessages(prev => [...prev, {
+                                        id: `dm-sent-${messageIdCounter.current++}`,
+                                        user: username, text: msg.message.text,
+                                        timestamp: msg.message.timestamp,
+                                        isDM: true, dmRecipient: msg.message.dmRecipient,
+                                        isMyMessage: true,
+                                    }]);
+                                    break;
+                                case "clients_update":
+                                    setAvailableClients(msg.clients.filter((c: string) => c !== username));
+                                    break;
+                            }
+                        } catch {}
+                    };
 
-                    case "dm_sent":
-                        // Confirmación de DM enviado
-                        const sentDM: Message = {
-                            id: `dm-sent-${messageIdCounter.current++}`,
-                            user: username,
-                            text: data.message.text,
-                            timestamp: data.message.timestamp,
-                            isDM: true,
-                            dmRecipient: data.message.dmRecipient,
-                            isMyMessage: true
-                        };
-                        setMessages(prev => [...prev, sentDM]);
-                        console.log(`[WS] DM enviado confirmado a ${data.message.dmRecipient}`);
-                        break;
-
-                    case "clients_update":
-                        // Actualización de lista de clientes
-                        const filteredClients = data.clients.filter((c: string) => c !== username);
-                        setAvailableClients(filteredClients);
-                        console.log(`[WS] Clientes actualizados: ${data.clients.length}`);
-                        break;
-
-                    default:
-                        console.warn("[WS] Tipo de mensaje desconocido:", data.type);
-                }
-            } catch (err) {
-                console.error("[WS] Error procesando mensaje:", err);
-            }
-        };
-
-        ws.onerror = (error) => {
-            console.error("[WS] Error:", error);
-            setError("Error de conexión con el servidor");
-            setWsConnected(false);
-        };
-
-        ws.onclose = () => {
-            console.log("[WS] Desconectado");
-            setWsConnected(false);
-        };
+                    ws.onerror = () => { setError("Error de conexión con el servidor"); setWsConnected(false); };
+                    ws.onclose = () => setWsConnected(false);
+                })
+                .catch(() => { if (!cancelled) setError("No se pudo conectar con el servidor"); });
+        }, 300);
 
         return () => {
-            ws.close();
+            cancelled = true;
+            clearTimeout(timer);
+            if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
         };
     }, [username]);
 
