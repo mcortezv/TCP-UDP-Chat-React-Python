@@ -31,10 +31,8 @@ def login(req: Request, data: LoginData):
     if not server.is_running():
         return {"error": "No hay servidor corriendo. Inicia el servidor primero."}
 
-    # Verificar si el usuario ya existe
     if data.username in server.clients:
-        print(f"[API] ERROR: Usuario {data.username} ya existe")
-        return {"error": "El usuario ya existe"}
+        return {"status": "OK", "username": data.username}
 
     # Crear cliente
     client = server.create_client(data.username)

@@ -4,6 +4,7 @@ from core.server_controller import ServerController
 from api.routes.server import router as server_router
 from api.routes.client import router as client_router
 from api.routes.websocket import router as websocket_router
+from api.routes.auth import router as auth_router
 
 """
 Modulo principal del sistema que permite ejecutar la api.
@@ -25,6 +26,9 @@ def main():
         allow_methods=["*"],
         allow_headers=["*"]
     )
+
+    # Rutas de Autenticacion
+    app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 
     # Rutas del Servidor
     app.include_router(server_router, prefix="/server", tags=["Server"])

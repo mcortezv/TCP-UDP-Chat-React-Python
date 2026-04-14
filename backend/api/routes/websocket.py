@@ -1,31 +1,29 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from api.ws_server import manager
+import asyncio
 
 router = APIRouter()
 
 
-def get_controller(websocket: WebSocket):
-    """Dependency para obtener el controller"""
-    return websocket.app.state.server
-
-
 @router.websocket("/ws/{username}")
-async def websocket_endpoint(
-        websocket: WebSocket,
-        username: str,
-        controller=Depends(get_controller)
-):
+async def websocket_endpoint(websocket: WebSocket, username: str):
     """
     Endpoint WebSocket para conexiones de clientes
     """
+    controller = websocket.app.state.server
+
     # Asignar controller al manager si no está asignado
     if manager.controller is None:
         manager.set_controller(controller)
 
     # Verificar que el usuario existe en el sistema
     if username not in controller.clients:
-        await websocket.close(code=1008, reason="Usuario no autenticado")
-        return
+        if controller.is_running():
+            print(f"[WS] Usuario {username} no encontrado, recreando cliente...")
+            await asyncio.to_thread(controller.create_client, username)
+        else:
+            await websocket.close(code=1008, reason="Usuario no autenticado")
+            return
 
     # Conectar el WebSocket
     await manager.connect(username, websocket)
@@ -68,11 +66,12 @@ async def websocket_endpoint(
                 })
 
     except WebSocketDisconnect:
-        manager.disconnect(username)
-        await manager.send_clients_update()
-        print(f"[WS] Usuario {username} desconectado")
+        if manager.active_connections.get(username) == websocket:
+            manager.disconnect(username)
+            await manager.send_clients_update()
 
     except Exception as e:
         print(f"[WS] Error con {username}: {e}")
-        manager.disconnect(username)
-        await manager.send_clients_update()
+        if manager.active_connections.get(username) == websocket:
+            manager.disconnect(username)
+            await manager.send_clients_update()
