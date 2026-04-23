@@ -1,10 +1,20 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
+import logging
+import re
 
 """
 Modulo que define los enpoints para controlar al cliente.
 """
 router = APIRouter()
+logger = logging.getLogger("audit")
+
+_MAX_MSG = 500
+_UNSAFE_RE = re.compile(r"[<>]")
+
+
+def _sanitize(text: str) -> str:
+    return _UNSAFE_RE.sub("", text[:_MAX_MSG])
 
 
 class LoginData(BaseModel):
@@ -62,6 +72,7 @@ def send(req: Request, data: MessageData):
     :param data: mensaje a enviar (puede incluir destinatario específico)
     """
     server = req.app.state.server
+    ip = req.client.host if req.client else "unknown"
 
     # Verificar que el cliente existe
     if data.username not in server.client_objs:
@@ -71,18 +82,20 @@ def send(req: Request, data: MessageData):
     if data.recipient != "all" and data.recipient not in server.clients:
         return {"error": f"El usuario '{data.recipient}' no existe o no está conectado"}
 
-    # Enviar mensaje a traves del cliente
+    clean_message = _sanitize(data.message.strip())
+    if not clean_message:
+        return {"error": "El mensaje no puede estar vacío"}
+
     client = server.client_objs[data.username]
 
     try:
-        # Enviar el mensaje con el destinatario especificado
-        success = client.send(data.message, data.recipient)
+        success = client.send(clean_message, data.recipient)
         if success:
+            logger.info("MSG_SEND ip=%s from=%s to=%s len=%d", ip, data.username, data.recipient, len(clean_message))
             return {"status": "Mensaje enviado", "recipient": data.recipient}
         else:
             return {"error": "No se pudo enviar el mensaje. El socket no está disponible."}
     except TypeError as e:
-        # Error de argumentos - probablemente el método send no acepta recipient
         return {"error": f"Error de compatibilidad: {str(e)}. Verifica que los clientes estén actualizados."}
     except Exception as e:
         return {"error": f"Error al enviar: {str(e)}"}

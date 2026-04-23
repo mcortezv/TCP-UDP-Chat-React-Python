@@ -115,6 +115,10 @@ export default function Chat() {
 
     async function handleSend() {
         if (!message.trim()) return;
+        if (message.trim().length > 500) {
+            setError("El mensaje no puede exceder 500 caracteres");
+            return;
+        }
         setLoading(true);
         setError("");
 
@@ -244,6 +248,7 @@ export default function Chat() {
                     <textarea
                         value={message}
                         rows={1}
+                        maxLength={500}
                         placeholder={selectedRecipient === "all" ? "Mensaje para todos" : `Mensaje directo para ${selectedRecipient}`}
                         disabled={loading || !wsConnected}
                         className="flex-1 min-h-full px-3 py-2 text-black border-none outline-none resize-none focus:outline-none"
