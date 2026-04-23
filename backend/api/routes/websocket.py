@@ -1,8 +1,10 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from api.ws_server import manager
 import asyncio
+import logging
 
 router = APIRouter()
+logger = logging.getLogger("audit")
 
 
 @router.websocket("/ws/{username}")
@@ -25,7 +27,9 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
             await websocket.close(code=1008, reason="Usuario no autenticado")
             return
 
-    # Conectar el WebSocket
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    logger.info("WS_CONNECT ip=%s username=%s", client_ip, username)
+
     await manager.connect(username, websocket)
 
     try:
@@ -67,11 +71,13 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
 
     except WebSocketDisconnect:
         if manager.active_connections.get(username) == websocket:
+            logger.info("WS_DISCONNECT ip=%s username=%s", client_ip, username)
             manager.disconnect(username)
             await manager.send_clients_update()
 
     except Exception as e:
         print(f"[WS] Error con {username}: {e}")
         if manager.active_connections.get(username) == websocket:
+            logger.warning("WS_ERROR ip=%s username=%s error=%s", client_ip, username, str(e))
             manager.disconnect(username)
             await manager.send_clients_update()

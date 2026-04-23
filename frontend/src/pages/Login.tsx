@@ -20,6 +20,10 @@ export default function Login() {
             alert("El nombre de usuario debe tener al menos 3 caracteres");
             return;
         }
+        if (mode === "register" && !/^[a-zA-Z0-9_\-]+$/.test(username.trim())) {
+            alert("El nombre de usuario solo puede contener letras, números, guiones y guiones bajos");
+            return;
+        }
 
         setLoading(true);
         try {

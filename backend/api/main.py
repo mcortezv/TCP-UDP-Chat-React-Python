@@ -1,3 +1,5 @@
+import logging
+import os
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from core.server_controller import ServerController
@@ -5,6 +7,12 @@ from api.routes.server import router as server_router
 from api.routes.client import router as client_router
 from api.routes.websocket import router as websocket_router
 from api.routes.auth import router as auth_router
+
+os.makedirs("logs", exist_ok=True)
+_audit_handler = logging.FileHandler("logs/audit.log")
+_audit_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%dT%H:%M:%S"))
+logging.getLogger("audit").addHandler(_audit_handler)
+logging.getLogger("audit").setLevel(logging.INFO)
 
 """
 Modulo principal del sistema que permite ejecutar la api.
