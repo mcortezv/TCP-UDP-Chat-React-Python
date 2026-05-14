@@ -46,62 +46,105 @@ export default function Chat() {
                     if (cancelled) return;
                     if (data.error) { setError(data.error); return; }
 
-                    ws = new WebSocket(`ws://localhost:8000/ws/${username}`);
-                    wsRef.current = ws;
+                    // Intentar conectar WebSocket con reintentos
+                    const maxRetries = 3;
+                    let attempt = 0;
 
-                    ws.onopen = () => { setWsConnected(true); setError(""); };
+                    function connectWs() {
+                        if (cancelled) return;
+                        attempt++;
 
-                    ws.onmessage = (event) => {
-                        try {
-                            const msg = JSON.parse(event.data);
-                            switch (msg.type) {
-                                case "history":
-                                    if (msg.messages && Array.isArray(msg.messages)) {
-                                        setMessages(msg.messages.map((m: any) => ({
-                                            id: `history-${messageIdCounter.current++}`,
-                                            user: m.user, text: m.text,
-                                            timestamp: m.timestamp,
-                                            isDM: m.isDM || false,
-                                            dmRecipient: m.dmRecipient,
-                                            isMyMessage: m.user === username,
-                                        })));
-                                    }
-                                    break;
-                                case "new_message":
-                                    setMessages(prev => [...prev, {
-                                        id: `msg-${messageIdCounter.current++}`,
-                                        user: msg.message.user, text: msg.message.text,
-                                        timestamp: msg.message.timestamp,
-                                        isDM: false, isMyMessage: msg.message.user === username,
-                                    }]);
-                                    break;
-                                case "new_dm":
-                                    setMessages(prev => [...prev, {
-                                        id: `dm-${messageIdCounter.current++}`,
-                                        user: msg.message.user, text: msg.message.text,
-                                        timestamp: msg.message.timestamp,
-                                        isDM: true, dmRecipient: msg.message.dmRecipient,
-                                        isMyMessage: false,
-                                    }]);
-                                    break;
-                                case "dm_sent":
-                                    setMessages(prev => [...prev, {
-                                        id: `dm-sent-${messageIdCounter.current++}`,
-                                        user: username, text: msg.message.text,
-                                        timestamp: msg.message.timestamp,
-                                        isDM: true, dmRecipient: msg.message.dmRecipient,
-                                        isMyMessage: true,
-                                    }]);
-                                    break;
-                                case "clients_update":
-                                    setAvailableClients(msg.clients.filter((c: string) => c !== username));
-                                    break;
+                        const socket = new WebSocket(`ws://localhost:8000/ws/${username}`);
+
+                        socket.onopen = () => {
+                            if (cancelled) { socket.close(); return; }
+                            ws = socket;
+                            wsRef.current = socket;
+                            setWsConnected(true);
+                            setError("");
+                        };
+
+                        socket.onmessage = (event) => {
+                            try {
+                                const msg = JSON.parse(event.data);
+                                switch (msg.type) {
+                                    case "history":
+                                        if (msg.messages && Array.isArray(msg.messages)) {
+                                            setMessages(msg.messages.map((m: any) => ({
+                                                id: `history-${messageIdCounter.current++}`,
+                                                user: m.user, text: m.text,
+                                                timestamp: m.timestamp,
+                                                isDM: m.isDM || false,
+                                                dmRecipient: m.dmRecipient,
+                                                isMyMessage: m.user === username,
+                                            })));
+                                        }
+                                        break;
+                                    case "new_message":
+                                        setMessages(prev => [...prev, {
+                                            id: `msg-${messageIdCounter.current++}`,
+                                            user: msg.message.user, text: msg.message.text,
+                                            timestamp: msg.message.timestamp,
+                                            isDM: false, isMyMessage: msg.message.user === username,
+                                        }]);
+                                        break;
+                                    case "new_dm":
+                                        setMessages(prev => [...prev, {
+                                            id: `dm-${messageIdCounter.current++}`,
+                                            user: msg.message.user, text: msg.message.text,
+                                            timestamp: msg.message.timestamp,
+                                            isDM: true, dmRecipient: msg.message.dmRecipient,
+                                            isMyMessage: false,
+                                        }]);
+                                        break;
+                                    case "dm_sent":
+                                        setMessages(prev => [...prev, {
+                                            id: `dm-sent-${messageIdCounter.current++}`,
+                                            user: username, text: msg.message.text,
+                                            timestamp: msg.message.timestamp,
+                                            isDM: true, dmRecipient: msg.message.dmRecipient,
+                                            isMyMessage: true,
+                                        }]);
+                                        break;
+                                    case "clients_update":
+                                        setAvailableClients(msg.clients.filter((c: string) => c !== username));
+                                        break;
+                                    case "server_shutdown":
+                                        setError("El servidor se ha detenido");
+                                        setWsConnected(false);
+                                        wsRef.current = null;
+                                        break;
+                                }
+                            } catch {}
+                        };
+
+                        socket.onerror = () => {
+                            if (cancelled) return;
+                            // Cerrar el socket fallido para liberar recursos
+                            try { socket.close(); } catch {}
+                            if (attempt < maxRetries) {
+                                console.log(`[WS] Intento ${attempt} falló, reintentando...`);
+                                setTimeout(connectWs, 500);
+                            } else {
+                                setError("Error de conexión con el servidor");
+                                setWsConnected(false);
                             }
-                        } catch {}
-                    };
+                        };
 
-                    ws.onerror = () => { setError("Error de conexión con el servidor"); setWsConnected(false); };
-                    ws.onclose = () => setWsConnected(false);
+                        socket.onclose = (e) => {
+                            if (cancelled) return;
+                            if (wsRef.current === socket) {
+                                wsRef.current = null;
+                                setWsConnected(false);
+                                // Si el servidor cerro la conexion, mostrar razon
+                                if (e.code !== 1000 && e.code !== 1005) {
+                                    setError(e.reason || "Conexión cerrada por el servidor");
+                                }
+                            }
+                        };
+                    }
+
+                    connectWs();
                 })
                 .catch(() => { if (!cancelled) setError("No se pudo conectar con el servidor"); });
         }, 300);
