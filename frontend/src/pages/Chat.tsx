@@ -261,7 +261,7 @@ export default function Chat() {
                             <p>{m.text}</p>
                             {m.timestamp > 0 && (
                                 <span className="text-[10px] opacity-60 block mt-1">
-                                    {new Date(m.timestamp * 1000).toLocaleTimeString()}
+                                    {new Date(m.timestamp * 1000).toLocaleString()}
                                 </span>
                             )}
                         </div>
