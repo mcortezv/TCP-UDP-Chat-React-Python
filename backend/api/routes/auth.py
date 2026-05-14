@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 import hashlib
+import json
 import logging
+import os
 import re
 
 """
-Modulo que define los endpoints de autenticacion.
-Persiste usuarios en un diccionario en memoria.
+Modulo que define los endpoints de autenticacion
+Persiste usuarios en un archivo JSON
 """
 router = APIRouter()
 logger = logging.getLogger("audit")
@@ -14,7 +16,37 @@ logger = logging.getLogger("audit")
 _EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
-users: dict[str, dict] = {}
+_USERS_FILE = "data/users.json"
+
+
+def _load_users() -> dict[str, dict]:
+    """
+    Carga los usuarios desde el archivo JSON
+    Si el archivo no existe regresa un diccionario vacio
+    """
+    if not os.path.exists(_USERS_FILE):
+        return {}
+    try:
+        with open(_USERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[Auth] Error leyendo usuarios: {e}")
+        return {}
+
+
+def _save_users() -> None:
+    """
+    Guarda el diccionario de usuarios en el archivo JSON
+    """
+    os.makedirs("data", exist_ok=True)
+    try:
+        with open(_USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"[Auth] Error guardando usuarios: {e}")
+
+
+users: dict[str, dict] = _load_users()
 
 
 class AuthData(BaseModel):
@@ -54,6 +86,7 @@ def register(data: AuthData, request: Request):
         "username": username,
         "password": hash_password(data.password),
     }
+    _save_users()
     logger.info("REGISTER_OK ip=%s email=%s username=%s", ip, email, username)
     return {"status": "OK", "username": username}
 

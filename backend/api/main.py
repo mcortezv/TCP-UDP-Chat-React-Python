@@ -1,7 +1,8 @@
 import logging
 import os
 from fastapi import FastAPI
-from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.cors import CORSMiddleware as _CORSMiddleware
+from starlette.types import Receive, Scope, Send
 from core.server_controller import ServerController
 from api.routes.server import router as server_router
 from api.routes.client import router as client_router
@@ -15,15 +16,27 @@ logging.getLogger("audit").addHandler(_audit_handler)
 logging.getLogger("audit").setLevel(logging.INFO)
 
 """
-Modulo principal del sistema que permite ejecutar la api.
+Modulo principal del sistema que permite ejecutar la api
 """
+
+
+class CORSMiddleware(_CORSMiddleware):
+    """
+    Subclase de CORSMiddleware que permite conexiones WebSocket
+    sin pasar por la validacion CORS
+    """
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "websocket":
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
 
 
 def main():
     """
     Funcion principal que ejecuta la api a la que se conecta
-    el front, crea la app, establece restricciones de acceso
-    y establece las rutas del servidor y cliente.
+    el front crea la app establece restricciones de acceso
+    y establece las rutas del servidor y cliente
     """
     app = FastAPI()
     app.state.server = ServerController()
@@ -54,6 +67,7 @@ app = main()
 
 if __name__ == "__main__":
     # Uvicorn para desplegar la api en local
+    # ws="wsproto" evita que la libreria websockets v15+ rechace conexiones WebSocket
     import uvicorn
 
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True, ws="wsproto")

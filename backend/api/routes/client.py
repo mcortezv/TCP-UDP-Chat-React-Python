@@ -1,20 +1,26 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
+import asyncio
 import logging
 import re
 
 """
-Modulo que define los enpoints para controlar al cliente.
+Modulo que define los endpoints para controlar al cliente
 """
 router = APIRouter()
 logger = logging.getLogger("audit")
 
 _MAX_MSG = 500
-_UNSAFE_RE = re.compile(r"[<>]")
+# Quita caracteres peligrosos para HTML y caracteres de control (saltos de linea, tabs, etc.)
+_UNSAFE_RE = re.compile(r"[<>\r\n\t\x00]")
 
 
 def _sanitize(text: str) -> str:
-    return _UNSAFE_RE.sub("", text[:_MAX_MSG])
+    """
+    Limpia el texto de un mensaje corta a 500 caracteres
+    quita etiquetas HTML basicas y caracteres de control
+    """
+    return _UNSAFE_RE.sub("", text[:_MAX_MSG]).strip()
 
 
 class LoginData(BaseModel):
@@ -28,9 +34,9 @@ class MessageData(BaseModel):
 
 
 @router.post("/login")
-def login(req: Request, data: LoginData):
+async def login(req: Request, data: LoginData):
     """
-    Funcion que pemite iniciar un nuevo cliente.
+    Funcion que permite iniciar un nuevo cliente
     :param req: acceso a servidor singleton
     :param data: nombre del usuario que quiere crear un nuevo cliente
     :return: nombre del usuario
@@ -44,17 +50,22 @@ def login(req: Request, data: LoginData):
     if data.username in server.clients:
         return {"status": "OK", "username": data.username}
 
-    # Crear cliente
-    client = server.create_client(data.username)
-    if client is None:
-        return {"error": "No se pudo crear el cliente"}
-    return {"status": "OK", "username": data.username}
+    # Crear cliente en un hilo separado para no bloquear el event loop
+    try:
+        client = await asyncio.to_thread(server.create_client, data.username)
+        if client is None:
+            return {"error": "No se pudo crear el cliente"}
+        return {"status": "OK", "username": data.username}
+    except ValueError as e:
+        return {"error": str(e)}
+    except Exception as e:
+        return {"error": "Error interno del servidor"}
 
 
 @router.post("/logout")
 def logout(req: Request, data: LoginData):
     """
-    Funcion que permite remover al cliente del servidor.
+    Funcion que permite remover al cliente del servidor
     :param req: acceso a servidor singleton
     :param data: nombre del usuario que quiere remover
     :return: nombre del usuario
@@ -67,9 +78,9 @@ def logout(req: Request, data: LoginData):
 @router.post("/send")
 def send(req: Request, data: MessageData):
     """
-    Funcion que permite enviar un mensaje al servidor.
+    Funcion que permite enviar un mensaje al servidor
     :param req: servidor singleton
-    :param data: mensaje a enviar (puede incluir destinatario específico)
+    :param data: mensaje a enviar
     """
     server = req.app.state.server
     ip = req.client.host if req.client else "unknown"
@@ -104,9 +115,9 @@ def send(req: Request, data: MessageData):
 @router.get("/history")
 def history(req: Request):
     """
-    Funcion que devuelve el historial de mensajes que han pasado por el servidor.
+    Funcion que devuelve el historial de mensajes que han pasado por el servidor
     :param req: servidor singleton
-    :return: diccionarrio con el historial de mensajes
+    :return: diccionario con el historial de mensajes
     """
     server = req.app.state.server
     return {"history": server.history}
@@ -115,9 +126,9 @@ def history(req: Request):
 @router.get("/clients")
 def list_clients(req: Request):
     """
-    Funcion que regresa una lista de clientes registrados.
+    Funcion que regresa una lista de clientes registrados
     :param req: servidor singleton
-    :return: diccionarrio con los clientes registrados
+    :return: diccionario con los clientes registrados
     """
     server = req.app.state.server
     return {"clients": list(server.clients)}
@@ -126,10 +137,10 @@ def list_clients(req: Request):
 @router.get("/dms/{username}")
 def get_dms(req: Request, username: str):
     """
-    Funcion que devuelve los DMs recibidos por un usuario
+    Funcion que devuelve los mensajes privados recibidos por un usuario
     :param req: servidor singleton
     :param username: nombre del usuario
-    :return: lista de DMs
+    :return: lista de mensajes privados
     """
     server = req.app.state.server
 

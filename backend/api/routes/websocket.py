@@ -12,24 +12,23 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
     """
     Endpoint WebSocket para conexiones de clientes
     """
+    client_ip = websocket.client.host if websocket.client else "unknown"
     controller = websocket.app.state.server
 
-    # Asignar controller al manager si no está asignado
     if manager.controller is None:
         manager.set_controller(controller)
 
-    # Verificar que el usuario existe en el sistema
     if username not in controller.clients:
         if controller.is_running():
             print(f"[WS] Usuario {username} no encontrado, recreando cliente...")
             await asyncio.to_thread(controller.create_client, username)
         else:
+            logger.warning("WS_REJECT ip=%s username=%s reason=server_not_running", client_ip, username)
+            await websocket.accept()
             await websocket.close(code=1008, reason="Usuario no autenticado")
             return
 
-    client_ip = websocket.client.host if websocket.client else "unknown"
     logger.info("WS_CONNECT ip=%s username=%s", client_ip, username)
-
     await manager.connect(username, websocket)
 
     try:
@@ -70,14 +69,18 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
                 })
 
     except WebSocketDisconnect:
+        # Solo limpiar si esta conexion es la actual para este usuario
         if manager.active_connections.get(username) == websocket:
             logger.info("WS_DISCONNECT ip=%s username=%s", client_ip, username)
-            manager.disconnect(username)
+            # Remover del dict sin intentar cerrar (ya esta desconectado)
+            manager.active_connections.pop(username, None)
+            print(f"[WS] Usuario {username} desconectado")
             await manager.send_clients_update()
 
     except Exception as e:
         print(f"[WS] Error con {username}: {e}")
         if manager.active_connections.get(username) == websocket:
             logger.warning("WS_ERROR ip=%s username=%s error=%s", client_ip, username, str(e))
-            manager.disconnect(username)
+            manager.active_connections.pop(username, None)
+            print(f"[WS] Usuario {username} desconectado (error)")
             await manager.send_clients_update()
