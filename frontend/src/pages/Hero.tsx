@@ -18,11 +18,11 @@ export default function Hero() {
                 <Card className="h-max w-max flex-row items-center border border-blue-gray-50 py-4 px-5 shadow-lg shadow-blue-gray-900/5">
                     <img src="/itson.png" alt="Itson Logo" className="mr-6 h-10" />
                     <code className="text-blue-gray-900">
-                        Redes <strong>8:30 Martes/Jueves</strong>
+                        Seguridad <strong>3:00 Martes/Jueves</strong>
                     </code>
                 </Card>
                 <Card className="h-max w-max border border-blue-gray-50 font-semibold text-blue-gray-900 shadow-lg shadow-blue-gray-900/5">
-                    <div className="py-4 pl-4 pr-5">Carlos Alberto Gonzalez Vega</div>
+                    <div className="py-4 pl-4 pr-5">Mario Jesus Arispuro Rincon</div>
                 </Card>
             </div>
             <button
@@ -33,7 +33,8 @@ export default function Hero() {
             </button>
             <div className="flex-col gap-2 pt-32 pb-40 text-center">
                 <Typography variant="h1" color="blue-gray" className="text-8xl animate-float delay-2200">
-                    Welcome to ING-CHAT
+                    PotroSeguriMega <br/>
+                    HiperTurboChat
                 </Typography>
                 <Typography variant="lead" color="blue-gray" className="opacity-70 text-2xl mt-4">
                     Bienvenido, <strong>{username}</strong>. Entra al chat y envía mensajes <br />
@@ -207,11 +208,11 @@ export default function Hero() {
                                 <path d="M5 42c0-7 6-12 13-12s13 5 13 12H5zm14-12c7 0 13 5 13 12h13c0-7-6-12-13-12"
                                     stroke="#000" strokeWidth="2" fill="none" />
                             </svg>
-                            Equipo Redes
+                            Equipo Seguridad
                         </Typography>
                         <Typography color="blue-gray" className="font-normal opacity-70">
-                            Nuestro equipo está conformado por David Escarcega, Roberto Cornejo y Manuel Cortez, Proyecto
-                            Final de la materia de Redes. (Equipo 8)
+                            Nuestro equipo está conformado por Jorge Burgos, Jesus Valdez, Luis Manjarrez y Manuel Cortez, Proyecto
+                            Final de la materia de Seguridad.
                         </Typography>
                     </Card>
                 </a>
