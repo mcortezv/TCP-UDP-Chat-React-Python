@@ -90,7 +90,7 @@ manager = ConnectionManager()
 
 
 async def notify_new_message(message_data: dict):
-        """Notifica a todos los usuarios sobre un nuevo mensaje broadcast"""
+    """Notifica a todos los usuarios sobre un nuevo mensaje broadcast"""
     await manager.broadcast_message({
         "type": "new_message",
         "message": message_data

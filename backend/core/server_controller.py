@@ -24,7 +24,7 @@ class ServerController:
         """
         self.server = None
         self.protocol = None
-        self.HOST = "192.168.0.2"
+        self.HOST = "0.0.0.0"
         self.PORT = 1060
         self.clients = set()
         self.client_objs = {}
