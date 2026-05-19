@@ -101,7 +101,7 @@ export default function Hero() {
             </div>
             <div className="hidden md:block absolute bottom-[20%] right-[10%] animate-float">
                 <img
-                    src="src/assets/carlos.png"
+                    src="src/assets/mario.png"
                     alt="Carlos"
                     className="w-[280px] object-contain opacity-90"
                 />
